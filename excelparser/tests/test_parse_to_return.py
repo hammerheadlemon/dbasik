@@ -13,6 +13,38 @@ from register.models import FinancialQuarter
 from returns.models import Return
 
 
+class TestSpecificErrors(TestCase):
+    def setUp(self):
+        """
+        If looking to test specific error types, add a corresponding
+        cell in the datamap; create a test spreadsheet containing the
+        error and point to it from here.
+        """
+        self.financial_quarter = FinancialQuarter.objects.create(quarter=4, year=2018)
+        self.project = ProjectFactory()
+        self.datamap = DatamapFactory()
+        self.return_obj = Return.objects.create(
+            project=self.project, financial_quarter=self.financial_quarter
+        )
+        DatamapLine.objects.create(
+            datamap=self.datamap, key="Bad Phone Number", sheet="Sheet1", cell_ref="B1"
+        )
+        self.populated_template = "/home/lemon/code/python/dbasik-dftgovernance/excelparser/tests/bad_phone_number.xlsm"
+        self.parsed_spreadsheet = ParsedSpreadsheet(
+            template_path=self.populated_template,
+            project=self.project,
+            return_obj=self.return_obj,
+            datamap=self.datamap,
+        )
+    def test_return_parser_flags_bad_number(self):
+        self.parsed_spreadsheet.process()
+        return_item = Return.objects.get(
+            id=self.return_obj.id
+        ).return_returnitems.first()
+        self.assertEqual(return_item.datamapline.key, "Bad mobile number")
+        self.assertEqual(return_item.value_int, 7678877654)
+
+
 class TestParseToReturn(TestCase):
     def setUp(self):
         self.financial_quarter = FinancialQuarter.objects.create(quarter=4, year=2018)
@@ -62,7 +94,9 @@ class TestParseToReturn(TestCase):
 
     def test_return_parser(self):
         self.parsed_spreadsheet.process()
-        return_item = Return.objects.get(id=self.return_obj.id).return_returnitems.first()
+        return_item = Return.objects.get(
+            id=self.return_obj.id
+        ).return_returnitems.first()
         self.assertEqual(return_item.datamapline.key, "Project Name")
         self.assertEqual(return_item.value_str, "Testable Project")
 
