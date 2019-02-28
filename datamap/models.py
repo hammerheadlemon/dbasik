@@ -37,6 +37,7 @@ class DatamapLine(models.Model):
         ('Integer', "INTEGER"),
         ('Float', "FLOAT"),
         ('Date', "DATE"),
+        ('Phone', "PHONE"),
     )
 
     """A single line in the datamap."""

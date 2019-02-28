@@ -44,9 +44,10 @@ class ProcessPopulatedTemplate(FormView):
         project = form.cleaned_data['return_obj'].project
         return_obj = form.cleaned_data['return_obj']
         datamap = form.cleaned_data['datamap']
+        use_datamap_types = form.cleaned_data['use_datamap_types']
         try:
             logger.info("Trying to parse spreadsheet {}".format(save_path))
-            parsed_spreadsheet = ParsedSpreadsheet(path, project, return_obj, datamap)
+            parsed_spreadsheet = ParsedSpreadsheet(path, project, return_obj, datamap, use_datamap_types)
         except Exception:
             messages.add_message(self.request, messages.ERROR, f"ERROR uploading file: {uploaded_file}. Please check that it is a valid template.")
             return redirect("excelparser:process_populated", self.kwargs['return_id'])

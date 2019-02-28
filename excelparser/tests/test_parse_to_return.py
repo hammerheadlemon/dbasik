@@ -4,6 +4,7 @@ from datetime import datetime, date
 
 from django.test import TestCase
 from django.utils import timezone
+from django.db.utils import DataError
 
 from datamap.models import DatamapLine
 from excelparser.helpers.parser import ParsedSpreadsheet, CellData, CellValueType
@@ -11,6 +12,7 @@ from factories.datamap_factories import DatamapFactory
 from factories.datamap_factories import ProjectFactory
 from register.models import FinancialQuarter
 from returns.models import Return
+from exceptions.exceptions import DatamapLineValidationError
 
 
 class TestSpecificErrors(TestCase):
@@ -27,7 +29,7 @@ class TestSpecificErrors(TestCase):
             project=self.project, financial_quarter=self.financial_quarter
         )
         DatamapLine.objects.create(
-            datamap=self.datamap, key="Bad Phone Number", sheet="Sheet1", cell_ref="B1"
+            datamap=self.datamap, key="Bad Phone Number", data_type="Phone", sheet="Sheet1", cell_ref="B1"
         )
         self.populated_template = "/home/lemon/code/python/dbasik-dftgovernance/excelparser/tests/bad_phone_number.xlsm"
         self.parsed_spreadsheet = ParsedSpreadsheet(
@@ -35,14 +37,12 @@ class TestSpecificErrors(TestCase):
             project=self.project,
             return_obj=self.return_obj,
             datamap=self.datamap,
+            use_datamap_types=True
         )
+
     def test_return_parser_flags_bad_number(self):
-        self.parsed_spreadsheet.process()
-        return_item = Return.objects.get(
-            id=self.return_obj.id
-        ).return_returnitems.first()
-        self.assertEqual(return_item.datamapline.key, "Bad mobile number")
-        self.assertEqual(return_item.value_int, 7678877654)
+        with self.assertRaises(DatamapLineValidationError):
+            self.parsed_spreadsheet.process()
 
 
 class TestParseToReturn(TestCase):

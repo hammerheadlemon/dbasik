@@ -31,10 +31,16 @@ class ParsedSpreadsheet:
     """
 
     def __init__(
-        self, template_path: str, project: Project, return_obj: Return, datamap: Datamap
+        self,
+        template_path: str,
+        project: Project,
+        return_obj: Return,
+        datamap: Datamap,
+        use_datamap_types: bool,
     ) -> None:
         self.sheetnames: List[str]
         self.filename: str
+        self.use_datamap_types = use_datamap_types
         self.project_name = project.name
         self._template_path = template_path
         self._return_obj = return_obj
@@ -92,9 +98,11 @@ class ParsedSpreadsheet:
         logger.debug("Opening wb {}".format(wb))
         for ws in self.sheetnames:
             ws_from_dm = WorkSheetFromDatamap(
-                openpyxl_worksheet=wb[ws], datamap=self._datamap
+                openpyxl_worksheet=wb[ws],
+                datamap=self._datamap,
+                use_datamap_types=self.use_datamap_types,
             )
-            ws_from_dm._convert()
+            #           ws_from_dm._convert(self.use_datamap_types)
             self._sheet_data[ws] = ws_from_dm
 
     def process(self) -> None:
@@ -170,25 +178,36 @@ class WorkSheetFromDatamap:
     ParsedSpreadsheet object.
     """
 
-    def __init__(self, openpyxl_worksheet: OpenpyxlWorksheet, datamap: Datamap) -> None:
+    def __init__(
+        self,
+        openpyxl_worksheet: OpenpyxlWorksheet,
+        datamap: Datamap,
+        use_datamap_types: bool,
+    ) -> None:
         self._data: Dict[str, CellData] = {}
         self._openpyxl_worksheet = openpyxl_worksheet
         self._datamap = datamap
-        self._convert()
+        self._convert(use_datamap_types)
         self.title = self._openpyxl_worksheet.title
 
     def __getitem__(self, item):
         return self._data[item]
 
-    def _convert(self) -> None:
+    def _convert(self, use_datamap_types) -> None:
         """
         Populates self._data dictionary with data from the spreadsheet.
-        If type of data is not expected (i.e. not in the enum CellValueType)
+        If type of data is not e pected (i.e. not in the enum CellValueType)
         will still parse the data but classify it as CellValueType.UNKOWN
         for onward processing.
         :return: None
         :rtype: None
         """
+        if use_datamap_types:
+            logger.debug(
+                f"Parsing {self} with use_datamap_types set to {use_datamap_types}"
+            )
+            # TODO - here we need process based on user selction of type detection
+            # Could do something with _detect_cell_type() to achieve that.
         for _dml in self._datamap.datamaplines.filter(
             sheet__exact=self._openpyxl_worksheet.title
         ):

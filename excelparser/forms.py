@@ -6,7 +6,7 @@ from crispy_forms.layout import Fieldset
 from crispy_forms.layout import Layout
 from crispy_forms.layout import Submit
 from django.core.validators import FileExtensionValidator
-from django.forms import FileField
+from django.forms import FileField, BooleanField
 from django.forms import ModelChoiceField
 from django.forms import forms
 from django.urls import reverse
@@ -44,6 +44,7 @@ class ProcessPopulatedTemplateForm(forms.Form):
             f"Please select an existing Datamap. <a href='/datamaps{datamap_create_url}'>Create new Datamap</a>"
         ),
     )
+    use_datamap_types = BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -61,6 +62,7 @@ class ProcessPopulatedTemplateForm(forms.Form):
                 f"Process a populated template for {project_being_done}",
                 "datamap",
                 "source_file",
+                "use_datamap_types",
             ),
             Field("return_obj", type="hidden"),
             ButtonHolder(
