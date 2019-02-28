@@ -29,7 +29,11 @@ class TestSpecificErrors(TestCase):
             project=self.project, financial_quarter=self.financial_quarter
         )
         DatamapLine.objects.create(
-            datamap=self.datamap, key="Bad Phone Number", data_type="Phone", sheet="Sheet1", cell_ref="B1"
+            datamap=self.datamap,
+            key="Bad Phone Number",
+            data_type="Phone",
+            sheet="Sheet1",
+            cell_ref="B1",
         )
         self.populated_template = "/home/lemon/code/python/dbasik-dftgovernance/excelparser/tests/bad_phone_number.xlsm"
         self.parsed_spreadsheet = ParsedSpreadsheet(
@@ -37,7 +41,7 @@ class TestSpecificErrors(TestCase):
             project=self.project,
             return_obj=self.return_obj,
             datamap=self.datamap,
-            use_datamap_types=True
+            use_datamap_types=True,
         )
 
     def test_return_parser_flags_bad_number(self):
