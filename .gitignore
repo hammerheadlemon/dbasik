@@ -22,3 +22,4 @@ Test Results - CSV_Form_Validator_Tests.html
 /venve/
 excelparser/tests/does_not_open_workbook.xlsm
 returns/tests/expected_test_output.xlsm
+.~lock*
