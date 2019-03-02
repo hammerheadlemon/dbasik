@@ -3,6 +3,7 @@ import datetime
 import numbers
 import os
 from enum import Enum, auto
+from collections import defaultdict
 from typing import Any, Dict, List, NamedTuple, Iterable, Optional
 
 from openpyxl import Workbook as OpenpyxlWorkbook
@@ -62,6 +63,7 @@ class ParsedSpreadsheet:
             CellValueType.INTEGER: "value_int",
             CellValueType.FLOAT: "value_float",
             CellValueType.DATE: "value_date",
+            CellValueType.PHONE: "value_phone",
         }
         try:
             return _map[cell_data.type]
@@ -122,6 +124,11 @@ class ParsedSpreadsheet:
         )
         for dml in relevant_dmls:
             logger.debug(f"Processing {dml.key} in {dml.sheet}")
+            # TODO now we have to do something with this - to get phone number
+            # we need to check that the values we have pass tests:
+            # .e.g that a PHONE type matches a regex, or an integer
+            # is going to fit in the database, and we raise exceptions
+            # that can be stored and returned to the UI if not
             _return_param = self._map_to_keyword_param(sheet[dml.key])
             logger.debug(f"_return_param: {_return_param}")
             _value_dict = {_return_param: sheet[dml.key].value}
@@ -194,33 +201,38 @@ class WorkSheetFromDatamap:
     def __getitem__(self, item):
         return self._data[item]
 
-    def cell_detect_factory(self, override_type: Optional[CellValueType] = None):
-        if not override_type:
-            def parse(obj: Any) -> CellValueType:
-                """
-                Takes an object and maps its type to the CellValueType enum.
-                Raises ValueError exception if the object is not an enum type
-                useful for this process (int, str, float, etc).
-                :param obj:
-                :type obj: List[str]
-                :return: CellValueType
-                :rtype: None
-                """
-                if isinstance(obj, numbers.Integral):
-                    return CellValueType.INTEGER
-                if isinstance(obj, str):
-                    return CellValueType.STRING
-                if isinstance(obj, float):
-                    return CellValueType.FLOAT
-                if isinstance(obj, (datetime.datetime, datetime.date)):
-                    return CellValueType.DATE
-                else:
-                    raise ValueError("Cannot detect applicable type")
-            return parse
+    def _map_cell_type_from_datamap(self, declared_type: str) -> CellValueType:
+        _types = defaultdict(
+            lambda: CellValueType.STRING,
+            Text=CellValueType.STRING,
+            Integer=CellValueType.INTEGER,
+            Float=CellValueType.FLOAT,
+            Date=CellValueType.DATE,
+            Phone=CellValueType.PHONE
+        )
+        return _types[declared_type]
+
+
+    def _detect_cell_type(self, obj: Any) -> CellValueType:
+        """
+        Takes an object and maps its type to the CellValueType enum.
+        Raises ValueError exception if the object is not an enum type
+        useful for this process (int, str, float, etc).
+        :param obj:
+        :type obj: List[str]
+        :return: CellValueType
+        :rtype: None
+        """
+        if isinstance(obj, numbers.Integral):
+            return CellValueType.INTEGER
+        if isinstance(obj, str):
+            return CellValueType.STRING
+        if isinstance(obj, float):
+            return CellValueType.FLOAT
+        if isinstance(obj, (datetime.datetime, datetime.date)):
+            return CellValueType.DATE
         else:
-            def override(obj: Any):
-                return override_type
-            return override
+            raise ValueError("Cannot detect applicable type")
 
     def _convert(self, use_datamap_types) -> None:
         """
@@ -231,14 +243,7 @@ class WorkSheetFromDatamap:
         :return: None
         :rtype: None
         """
-        if use_datamap_types:
-            logger.debug(
-                f"Parsing {self} with use_datamap_types set to {use_datamap_types}"
-            )
-            breakpoint()
-            # here we override the returned value from self._detect_cell_type
-            # TODO we need to find out the type before adding it as a func param here!!
-            self._detect_cell_type = self.cell_detect_factory(override_type=CellValueType.PHONE)
+        breakpoint()
         for _dml in self._datamap.datamaplines.filter(
             sheet__exact=self._openpyxl_worksheet.title
         ):
@@ -247,24 +252,44 @@ class WorkSheetFromDatamap:
             if isinstance(_parsed_value, datetime.datetime):
                 _parsed_value = _parsed_value.date()
             _sheet_title = self._openpyxl_worksheet.title
-            try:
-                _value = CellData(
-                    _key,
-                    _sheet_title,
-                    _parsed_value,
-                    _dml.cell_ref,
-                    _detect_cell_type(_parsed_value),
-                )
-                self._data[_key] = _value
-            except ValueError:
-                _value = CellData(
-                    _key,
-                    _sheet_title,
-                    _parsed_value,
-                    _dml.cell_ref,
-                    CellValueType.UNKNOWN,
-                )
-                self._data[_key] = _value
+            if use_datamap_types:
+                try:
+                    _value = CellData(
+                        _key,
+                        _sheet_title,
+                        _parsed_value,
+                        _dml.cell_ref,
+                        self._map_cell_type_from_datamap(_dml.data_type),
+                    )
+                    self._data[_key] = _value
+                except ValueError:
+                    _value = CellData(
+                        _key,
+                        _sheet_title,
+                        _parsed_value,
+                        _dml.cell_ref,
+                        self._detect_cell_type(_parsed_value)
+                    )
+                    self._data[_key] = _value
+            else:
+                try:
+                    _value = CellData(
+                        _key,
+                        _sheet_title,
+                        _parsed_value,
+                        _dml.cell_ref,
+                        self._detect_cell_type(_parsed_value),
+                    )
+                    self._data[_key] = _value
+                except ValueError:
+                    _value = CellData(
+                        _key,
+                        _sheet_title,
+                        _parsed_value,
+                        _dml.cell_ref,
+                        CellValueType.UNKNOWN,
+                    )
+                    self._data[_key] = _value
 
 
 
