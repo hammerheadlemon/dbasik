@@ -3,7 +3,7 @@ import datetime
 import numbers
 import os
 from enum import Enum, auto
-from typing import Any, Dict, List, NamedTuple, Iterable
+from typing import Any, Dict, List, NamedTuple, Iterable, Optional
 
 from openpyxl import Workbook as OpenpyxlWorkbook
 from openpyxl import load_workbook
@@ -157,6 +157,7 @@ class CellValueType(Enum):
     DATE = auto()
     FLOAT = auto()
     UNKNOWN = auto()
+    PHONE = auto()
 
 
 class CellData(NamedTuple):
@@ -193,6 +194,34 @@ class WorkSheetFromDatamap:
     def __getitem__(self, item):
         return self._data[item]
 
+    def cell_detect_factory(self, override_type: Optional[CellValueType] = None):
+        if not override_type:
+            def parse(obj: Any) -> CellValueType:
+                """
+                Takes an object and maps its type to the CellValueType enum.
+                Raises ValueError exception if the object is not an enum type
+                useful for this process (int, str, float, etc).
+                :param obj:
+                :type obj: List[str]
+                :return: CellValueType
+                :rtype: None
+                """
+                if isinstance(obj, numbers.Integral):
+                    return CellValueType.INTEGER
+                if isinstance(obj, str):
+                    return CellValueType.STRING
+                if isinstance(obj, float):
+                    return CellValueType.FLOAT
+                if isinstance(obj, (datetime.datetime, datetime.date)):
+                    return CellValueType.DATE
+                else:
+                    raise ValueError("Cannot detect applicable type")
+            return parse
+        else:
+            def override(obj: Any):
+                return override_type
+            return override
+
     def _convert(self, use_datamap_types) -> None:
         """
         Populates self._data dictionary with data from the spreadsheet.
@@ -206,8 +235,10 @@ class WorkSheetFromDatamap:
             logger.debug(
                 f"Parsing {self} with use_datamap_types set to {use_datamap_types}"
             )
-            # TODO - here we need process based on user selction of type detection
-            # Could do something with _detect_cell_type() to achieve that.
+            breakpoint()
+            # here we override the returned value from self._detect_cell_type
+            # TODO we need to find out the type before adding it as a func param here!!
+            self._detect_cell_type = self.cell_detect_factory(override_type=CellValueType.PHONE)
         for _dml in self._datamap.datamaplines.filter(
             sheet__exact=self._openpyxl_worksheet.title
         ):
@@ -236,23 +267,4 @@ class WorkSheetFromDatamap:
                 self._data[_key] = _value
 
 
-def _detect_cell_type(obj: Any) -> CellValueType:
-    """
-    Takes an object and maps its type to the CellValueType enum.
-    Raises ValueError exception if the object is not an enum type
-    useful for this process (int, str, float, etc).
-    :param obj:
-    :type obj: List[str]
-    :return: CellValueType
-    :rtype: None
-    """
-    if isinstance(obj, numbers.Integral):
-        return CellValueType.INTEGER
-    if isinstance(obj, str):
-        return CellValueType.STRING
-    if isinstance(obj, float):
-        return CellValueType.FLOAT
-    if isinstance(obj, (datetime.datetime, datetime.date)):
-        return CellValueType.DATE
-    else:
-        raise ValueError("Cannot detect applicable type")
+

@@ -1,10 +1,6 @@
-import unittest
-
-from datetime import datetime, date
+from datetime import date
 
 from django.test import TestCase
-from django.utils import timezone
-from django.db.utils import DataError
 
 from datamap.models import DatamapLine
 from excelparser.helpers.parser import ParsedSpreadsheet, CellData, CellValueType
@@ -35,7 +31,7 @@ class TestSpecificErrors(TestCase):
             sheet="Sheet1",
             cell_ref="B1",
         )
-        self.populated_template = "/home/lemon/code/python/dbasik-dftgovernance/excelparser/tests/bad_phone_number.xlsm"
+        self.populated_template = "/home/lemon/code/python/dbasik-dev/dbasik-dftgovernance/excelparser/tests/bad_phone_number.xlsm"
         self.parsed_spreadsheet = ParsedSpreadsheet(
             template_path=self.populated_template,
             project=self.project,
