@@ -4,7 +4,7 @@ import numbers
 import os
 from enum import Enum, auto
 from collections import defaultdict
-from typing import Any, Dict, List, NamedTuple, Iterable, Optional
+from typing import Any, Dict, List, NamedTuple, Iterable
 
 from openpyxl import Workbook as OpenpyxlWorkbook
 from openpyxl import load_workbook
@@ -13,11 +13,30 @@ from openpyxl.worksheet import Worksheet as OpenpyxlWorksheet
 from datamap.models import Datamap, DatamapLine
 from register.models import Project
 from returns.models import Return, ReturnItem
+from exceptions.exceptions import DatamapLineValidationError
 
 SheetData = Dict[str, "WorkSheetFromDatamap"]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def _check_phone_value(val):
+    """
+    Checks that an input meets with a requirement to be
+    CellValueType.PHONE.
+    """
+    # must be a string
+    if not isinstance(val, str):
+        raise DatamapLineValidationError(f"{val} should be a string. Converting.")
+    try:
+        val = str(val)
+    except TypeError:
+        logger.critical(f"Unknown value type: {val}")
+        return
+    # TODO - we are are not expecting other constraints for a
+    # phone number at the moment. Only that it should be a string.
+    return str(val)
 
 
 class MissingSheetError(Exception):
@@ -54,7 +73,7 @@ class ParsedSpreadsheet:
         self._check_sheets_present()
 
         self._return_params = set(
-            ["value_str", "value_int", "value_float", "value_date"]
+            ["value_str", "value_int", "value_float", "value_date", "value_phone"]
         )
 
     def _map_to_keyword_param(self, cell_data: "CellData") -> str:
@@ -117,6 +136,22 @@ class ParsedSpreadsheet:
         for sd in self._sheet_data.values():
             self._process_sheet_to_return(sd)
 
+    def _type_fix_or_raise_exception(self, value_d: dict):
+        """
+        Given a dictionary with a _return_param and the value,
+        check whether the value is expected type, depending
+        on whether we are inferring the type of expecting the
+        user to indicate the type from the datamap.
+        """
+        if self.use_datamap_types:
+            val, exp_type = list(zip(value_d.values(), value_d.keys()))[0]
+            logger.debug(f"Checking {val} - expecting a {exp_type}")
+            if exp_type == "value_phone":
+                try:
+                    _check_phone_value(val)
+                except (DatamapLineValidationError, TypeError):
+                    raise
+
     def _process_sheet_to_return(self, sheet: "WorkSheetFromDatamap") -> None:
         sheet_name: str = sheet.title
         relevant_dmls: Iterable[DatamapLine] = self._datamap.datamaplines.filter(
@@ -124,20 +159,15 @@ class ParsedSpreadsheet:
         )
         for dml in relevant_dmls:
             logger.debug(f"Processing {dml.key} in {dml.sheet}")
-            # TODO now we have to do something with this - to get phone number
-            # we need to check that the values we have pass tests:
-            # .e.g that a PHONE type matches a regex, or an integer
-            # is going to fit in the database, and we raise exceptions
-            # that can be stored and returned to the UI if not
             _return_param = self._map_to_keyword_param(sheet[dml.key])
-            logger.debug(f"_return_param: {_return_param}")
             _value_dict = {_return_param: sheet[dml.key].value}
-            logger.debug(f"_value_dict: {_value_dict}")
+            try:
+                _value_dict = self._type_fix_or_raise_exception(_value_dict)
+            except (DatamapLineValidationError, TypeError):
+                raise
             _other_params = self._return_params - set([_return_param])
-            logger.debug(f"_other_params: {_other_params}")
             _combined_params = {k: None for k in list(_other_params)}
             _combined_params.update(_value_dict)
-            logger.debug(f"_combined_params: {_combined_params}")
             ReturnItem.objects.create(
                 parent=self.return_obj, datamapline=dml, **_combined_params
             )
@@ -243,7 +273,6 @@ class WorkSheetFromDatamap:
         :return: None
         :rtype: None
         """
-        breakpoint()
         for _dml in self._datamap.datamaplines.filter(
             sheet__exact=self._openpyxl_worksheet.title
         ):
