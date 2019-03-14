@@ -64,6 +64,7 @@ class ReturnItem(models.Model):
     )
     value_date = models.DateField(blank=True, null=True)
     value_datetime = models.DateTimeField(blank=True, null=True)
+    value_phone = models.CharField(null=True, blank=True, max_length=30, default="")
 
     def __str__(self):
         return f"{self.datamapline.key} for {self.parent}"

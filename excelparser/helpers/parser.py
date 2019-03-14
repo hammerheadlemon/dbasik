@@ -28,7 +28,7 @@ def _check_phone_value(val):
     """
     # must be a string
     if not isinstance(val, str):
-        raise DatamapLineValidationError(f"{val} should be a string. Converting.")
+        logger.debug(f"{val} should be a string. Converting.")
     try:
         val = str(val)
     except TypeError:
@@ -123,7 +123,6 @@ class ParsedSpreadsheet:
                 datamap=self._datamap,
                 use_datamap_types=self.use_datamap_types,
             )
-            #           ws_from_dm._convert(self.use_datamap_types)
             self._sheet_data[ws] = ws_from_dm
 
     def process(self) -> None:
@@ -148,9 +147,30 @@ class ParsedSpreadsheet:
             logger.debug(f"Checking {val} - expecting a {exp_type}")
             if exp_type == "value_phone":
                 try:
-                    _check_phone_value(val)
-                except (DatamapLineValidationError, TypeError):
+                    val = _check_phone_value(val)
+                    value_d['value_phone'] = val
+                except TypeError:
                     raise
+            if exp_type == "value_int":
+                if not isinstance(val, numbers.Integral):
+                    logger.debug(f"Checking {val} - expecting an {exp_type}")
+                    raise TypeError(f"Expecting an Integer but {val} is not an int")
+                logger.debug(f"Happy with {val}")
+            if exp_type == "value_float":
+                if not isinstance(val, float):
+                    logger.debug(f"Checking {val} - expecting an {exp_type}")
+                    raise TypeError(f"Expecting a Float but {val} is not an float")
+                logger.debug(f"Happy with {val}")
+            if exp_type == "value_date":
+                if not isinstance(val, datetime.date):
+                    logger.debug(f"Checking {val} - expecting an {exp_type}")
+                    raise TypeError(f"Expecting a Date but {val} is not an Date")
+                logger.debug(f"Happy with {val}")
+            return value_d
+        else:
+            return value_d
+
+
 
     def _process_sheet_to_return(self, sheet: "WorkSheetFromDatamap") -> None:
         sheet_name: str = sheet.title
@@ -267,7 +287,7 @@ class WorkSheetFromDatamap:
     def _convert(self, use_datamap_types) -> None:
         """
         Populates self._data dictionary with data from the spreadsheet.
-        If type of data is not e pected (i.e. not in the enum CellValueType)
+        If type of data is not expected (i.e. not in the enum CellValueType)
         will still parse the data but classify it as CellValueType.UNKOWN
         for onward processing.
         :return: None
